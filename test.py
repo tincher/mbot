@@ -1,7 +1,6 @@
 import configparser
 import mws
 
-
 config = configparser.ConfigParser()
 config.read('../account.ini')
 manne_conf = config['MANNE']
