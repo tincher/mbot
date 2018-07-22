@@ -1,11 +1,7 @@
 import configparser
 import mws
 import requests
-import datetime
 
-
-aa = datetime.datetime(2017, 1, 1).isoformat()
-bb = datetime.datetime.now()
 config = configparser.ConfigParser()
 config.read('../account.ini')
 manne_conf = config['MANNE']
