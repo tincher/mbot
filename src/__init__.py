@@ -1,0 +1,1 @@
+from .mannebot import ManneBot
