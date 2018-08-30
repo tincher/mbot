@@ -50,10 +50,10 @@ class ManneBot:
     # ------------------------------------------------------------------------------------------------------------------
     def refresh_product_list(self):
         try:
-            amazon_sku_list = self.get_amazon_listing_skus()
+            amazon_sku_list, amazon_listing = self.get_amazon_listing()
             bb_sku_list, bb_catalog = self.get_bb_listing_skus_and_catalog()
-            sku_list = self.get_matching_skus(amazon_sku_list, bb_sku_list)
-            self.product_list = self.get_products_for_skus(bb_catalog, sku_list)
+            self.product_list = self.product_filter(amazon_listing, bb_catalog, amazon_listing[0])
+            pass
         except RefreshmentError as e:
             print('Products could not be refreshed due to an Error: ', e.value)
         else:
@@ -63,12 +63,12 @@ class ManneBot:
     def get_bb_listing_skus_and_catalog(self):
         bb_catalog_url = self.bb_url + '/rest/catalog/products.json'
         bb_catalog = json.loads(requests.get(bb_catalog_url, headers=self.bb_header).text)
-        result = list(map(lambda x: x["sku"], bb_catalog))
-        if not len(result) >= 0:
+        sku_list = list(map(lambda x: x["sku"], bb_catalog))
+        if not len(sku_list) > 0:
             raise RefreshmentError('BigBuy: Catalog not receivable')
-        return result, bb_catalog
+        return sku_list, bb_catalog
 
-    def get_amazon_listing_skus(self):
+    def get_amazon_listing(self):
         report_request = self.reports_api.request_report(report_type='_GET_MERCHANT_LISTINGS_DATA_')
         if report_request.response.status_code == 200:
             starting_date = datetime.datetime.now() - datetime.timedelta(hours=5)
@@ -80,16 +80,25 @@ class ManneBot:
                 raise RefreshmentError('Amazon: No Merchant Listing Data')
             report = self.reports_api.get_report(newest_report_meta_list[0].ReportId)
             parsed_report = report.parsed.decode('iso-8859-1').split('\n')
-            return list(map(lambda x: x.split('\t')[3] if not len(x.split('\t')) < 3 else 0, parsed_report))
+            amazon_listing = [x for x in list(map(lambda x: x.split('\t'), parsed_report)) if len(x) == 48]
+            sku_list = list(map(lambda x: x[3] if not len(x) < 3 else 0, amazon_listing))
+            return sku_list, amazon_listing
+
+    def update_prices(self):
+        pass
 
     # ------------------------------------------------------------------------------------------------------------------
-    @staticmethod
-    def get_matching_skus(amazon_skus, bb_skus):
-        return list(set([x for x in amazon_skus if x in bb_skus]))
 
     @staticmethod
-    def get_products_for_skus(bb_catalog, sku_list):
-        return list(filter(lambda x: x['sku'] in sku_list, bb_catalog))
+    def product_filter(amazon_listing, bb_catalog, keys):
+        result = []
+        for i in bb_catalog:
+            matches = [x for x in amazon_listing if x[3] == i['sku']]
+            if len(matches) > 0:
+                result.append(dict(zip(keys, matches[0])))
+            if len(matches) > 1:
+                print('Multiple products with the same SKU detected')
+        return result
 
 
 # ----------------------------------------------------------------------------------------------------------------------
