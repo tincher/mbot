@@ -115,7 +115,7 @@ class ManneBot:
         wholesale_price = price = item['wholesalePrice']
         mwst = 1 / 1.19
         amazon_fee = self.get_amazon_fee(item['sku'], price, shipping)
-        while (price - (wholesale_price + amazon_fee)) * mwst < 0.1 * price:
+        while price * mwst - (shipping * mwst) - (wholesale_price + amazon_fee) < 0.1 * price:
             price *= 1.05
             amazon_fee = self.get_amazon_fee(item['sku'], price, shipping)
         return price
