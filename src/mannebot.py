@@ -1,3 +1,4 @@
+import csv
 import datetime
 import json
 import math
@@ -102,12 +103,68 @@ class ManneBot:
 
     def update_price(self):
         current_item = self.product_list[self.current_index]
-        shipping_cost = self.get_shipping_cost(current_item)
-        price = self.calculate_price(current_item, shipping_cost)
+        current_item_information = self.get_product_information(current_item, True)
+        is_valid, is_german = self.is_valid_item(current_item, current_item_information)
+        if is_valid:
+            shipping_cost = self.get_shipping_cost(current_item)
+            price = self.calculate_price(current_item, shipping_cost)
+            if not is_german:
+                pass  # todo
+            self.submit_price(current_item, current_item_information, price, shipping_cost)
 
-        self.submit_price(current_item, price, shipping_cost)
+    def is_valid_item(self, item, item_information):
+        correct_size = self.is_approved_size(item)
+        correct_price = self.is_an_approved_price(item)
+        correct_brand = self.is_an_approved_brand(item_information)
+        correct_sku = self.is_an_approved_sku(item_information)
+        correct_category = self.is_an_approved_category(item_information)
+        correct_name, german_name = self.is_same_name(item_information)
+        result = not (correct_size or correct_price or correct_brand or correct_sku or correct_category or correct_name)
+        return result, german_name
 
-    def submit_price(self, item, price, shipping):
+    def is_same_name(self, item_information):
+        amazon_item_list = [x for x in self.amazon_listing if x[3] == item_information['sku']]
+        if not len(amazon_item_list) > 0:
+            print('Error while evaluating if item is valid for new pricing')
+            return
+        if amazon_item_list[0]['name'] == item_information['name']:
+            return True, True
+        else:
+            spanish_item = self.get_product_information(item_information, False)
+            if amazon_item_list[0]['name'] == spanish_item['name']:
+                return True, False
+        return False, False
+
+    def is_an_approved_category(self, item_information):
+        category_url = self.bb_url + '/rest/catalog/productcategories/' + str(item_information['id']) + '.json'
+        r = requests.get(category_url, headers=self.bb_header)
+        item_categories = json.loads(r.text)
+        category_list = self.get_csv_file_as_list('../categories.csv')
+        same_categories = [x for x in item_categories if str(x['category']) in category_list]
+        if len(same_categories) > 0:
+            return False
+        return True
+
+    def is_an_approved_sku(self, item_information):
+        sku_list = self.get_csv_file_as_list('../skus.csv')
+        for sku in sku_list:
+            if sku == item_information['sku']:
+                return False
+        return True
+
+    def is_an_approved_brand(self, item_information):
+        brand_list = self.get_csv_file_as_list('../brands.csv')
+        for brand in brand_list:
+            if brand in item_information['name']:
+                return False
+        return True
+
+    def is_approved_size(self, item):
+        if self.calculate_gurtmass([item['height'], item['width'], item['depth']]) < 300:
+            return True
+        return False
+
+    def submit_price(self, item, item_information, price, shipping):
         rounded_price = self.round_price(price)
         print('Price submitted for SKU: ', item['sku'], ' with price: ', rounded_price, ' + ', shipping)
 
@@ -119,6 +176,14 @@ class ManneBot:
             price *= 1.05
             amazon_fee = self.get_amazon_fee(item['sku'], price, shipping)
         return price
+
+    def get_product_information(self, item, german):
+        iso_code = 'de'
+        if not german:
+            iso_code = 'es'
+        item_url = self.bb_url + '/rest/catalog/productinformation/' + str(item['id']) + '.json?isoCode=' + iso_code
+        r = requests.get(item_url, headers=self.bb_header)
+        return json.loads(r.text)
 
     def get_amazon_fee(self, sku, shipping, price):
         response = self.products_api.get_my_fee_estimate(self.marketplace_id, sku, price, shipping)
@@ -133,6 +198,23 @@ class ManneBot:
         return min(json.loads(r.text)['shippingOptions'], key=lambda x: x['cost'])['cost']
 
     # ------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def get_csv_file_as_list(filename):
+        with open(filename, 'r') as f:
+            reader = csv.reader(f)
+            return [item for sublist in list(reader) for item in sublist]
+
+    @staticmethod
+    def is_an_approved_price(item):
+        if item['wholesalePrice'] > 5:
+            return True
+        return False
+
+    @staticmethod
+    def calculate_gurtmass(dimensions):
+        longest = max(dimensions)
+        dimensions.remove(longest)
+        return longest + sum(map(lambda x: 2 * x, dimensions))
 
     @staticmethod
     def round_price(price):
