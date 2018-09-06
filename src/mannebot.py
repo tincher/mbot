@@ -21,10 +21,13 @@ class ManneBot:
     bb_url = 'https://api.bigbuy.eu'
 
     running = False
-    start_at_h = 0
-    start_at_m = 0
-    end_at_h = 23
-    end_at_m = 59
+    last_product_refreshment_h = 0
+    last_product_refreshment_min = 0
+    last_feed_submitted_h = 0
+    last_feed_submitted_min = 0
+    price_submitting_feed = ''
+    shipping_override_feed = ''
+    message_counter = 1
 
     current_index = 0
 
@@ -47,6 +50,10 @@ class ManneBot:
                                    region='DE')
         self.products_api = mws.Products(self.aws_id, self.secret_key, self.seller_id, auth_token=self.mws_token,
                                          region='DE')
+
+        self.price_submitting_feed = self.get_empty_price_feed_head()
+
+        # self.shipping_override_feed = self.get_shipping_override_empty_feed_header()
 
         def connection_test():
             bb_test_url = self.bb_url + '/rest/user/purse.json?_format=json'
@@ -77,6 +84,90 @@ class ManneBot:
             print('Products successfully refreshed')
             print('Product count: ', len(self.product_list))
 
+    def update_price(self):
+        current_item = self.product_list[self.current_index]
+        current_item_information = self.get_product_information(current_item, True)
+        is_valid, is_german = self.is_valid_item(current_item, current_item_information)
+        if is_valid:
+            shipping_cost, shipper = self.get_shipping_cost(current_item)
+            price = self.calculate_price(current_item, shipping_cost)
+            if not is_german:
+                pass  # todo
+            self.submit_price(current_item, shipper, price, shipping_cost)
+        else:
+            sleep(5)
+        self.current_index += 1
+        if self.current_index >= len(self.product_list):
+            self.current_index = 0
+
+    def submit_price(self, item, shipper, price, shipping):
+        rounded_price = self.round_price(price + shipping - 5)
+        self.price_submitting_feed += self.get_price_feed_for_product(item, rounded_price)
+        # self.shipping_override_feed += self.get_shipping_override_feed_for_product(item, shipping,
+        #                                                                            shipper['shippingService']['name'])
+        now = datetime.datetime.now()
+        if self.last_feed_submitted_h <= now.hour and self.last_feed_submitted_min + 3 < now.minute:
+            self.last_feed_submitted_h = now.hour
+            self.last_feed_submitted_min = now.minute
+            self.price_submitting_feed += self.get_emtpy_price_feed_footer()
+            self.price_submitting_feed = self.price_submitting_feed.encode('utf-8')
+            price_response = self.feeds_api.submit_feed(self.price_submitting_feed, '_POST_PRODUCT_PRICING_DATA_',
+                                                        marketplaceids=self.marketplace_id)
+            # self.shipping_override_feed += self.get_shipping_override_empty_feed_footer()
+            # self.shipping_override_feed = self.shipping_override_feed.encode('utf-8')
+            # shipping_response = self.feeds_api.submit_feed(self.shipping_override_feed,
+            #  '_POST_PRODUCT_OVERRIDES_DATA_', marketplaceids=self.marketplace_id)
+            # self.shipping_override_feed = self.get_shipping_override_empty_feed_header()
+            self.price_submitting_feed = self.get_empty_price_feed_head()
+            print(price_response)
+            # print(shipping_response)
+            print('Prices submitted')
+
+    # def get_shipping_override_empty_feed_footer(self):
+    #     return '</AmazonEnvelope>'
+    #
+    # def get_shipping_override_empty_feed_header(self):
+    #     return '<?xml version="1.0" encoding="utf-8" ?> ' \
+    #            '<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' \
+    #            'xsi:noNamespaceSchemaLocation="amzn-envelope.xsd"> ' \
+    #            '<Header> <DocumentVersion>1.02</DocumentVersion> ' \
+    #            '<MerchantIdentifier>' + self.seller_id + '</MerchantIdentifier> </Header>' \
+    #                                                      ' <MessageType>Override</MessageType>'
+    #
+    # def get_shipping_override_feed_for_product(self, item, shipping, shipping_name):
+    #     feed_content = '<Message>' \
+    #                    '<MessageID>1</MessageID>' \
+    #                    '<OperationType>Update</OperationType>' \
+    #                    '<Override>' \
+    #                    '<SKU>' + str(item['sku']) + '</SKU>' \
+    #                                                 '<ShippingOverride><ShipOption>Std DE Dom</ShipOption>' \
+    #                                                 '<Type>Exclusive</Type>' \
+    #                                                 '<ShipAmount currency="EUR">' + str(
+    #         shipping) + '</ShipAmount></ShippingOverride></Override>' \
+    #                     '</Message>'
+    #
+    #     return feed_content
+
+    def get_empty_price_feed_head(self):
+        return '<?xml version="1.0" encoding="utf-8" ?> ' \
+               '<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' \
+               'xsi:noNamespaceSchemaLocation="amzn-envelope.xsd"> ' \
+               '<Header> <DocumentVersion>1.01</DocumentVersion> ' \
+               '<MerchantIdentifier>' + self.seller_id + '</MerchantIdentifier> </Header>' \
+                                                         '<MessageType>Price</MessageType> '
+
+    @staticmethod
+    def get_emtpy_price_feed_footer():
+        return '</AmazonEnvelope>'
+
+    def get_price_feed_for_product(self, item, price):
+        return '<Message> <MessageID>' + str(self.message_counter) + '</MessageID> ' \
+                                                                     '<Price> <SKU>' \
+               + str(item['sku']) + '</SKU><StandardPrice currency="EUR">' + str(price) + \
+               '</StandardPrice> ' \
+               '</Price> </Message> '
+
+    # ------------------------------------------------------------------------------------------------------------------
     def get_bb_listing_skus_and_catalog(self):
         bb_catalog_url = self.bb_url + '/rest/catalog/products.json'
         bb_catalog = json.loads(requests.get(bb_catalog_url, headers=self.bb_header).text)
@@ -101,16 +192,38 @@ class ManneBot:
             sku_list = list(map(lambda x: x[3] if not len(x) < 3 else 0, amazon_listing))
             return sku_list, amazon_listing
 
-    def update_price(self):
-        current_item = self.product_list[self.current_index]
-        current_item_information = self.get_product_information(current_item, True)
-        is_valid, is_german = self.is_valid_item(current_item, current_item_information)
-        if is_valid:
-            shipping_cost = self.get_shipping_cost(current_item)
-            price = self.calculate_price(current_item, shipping_cost)
-            if not is_german:
-                pass  # todo
-            self.submit_price(current_item, current_item_information, price, shipping_cost)
+    def calculate_price(self, item, shipping):
+        wholesale_price = price = item['wholesalePrice']
+        mwst = 1 / 1.19
+        amazon_fee = self.get_amazon_fee(item['sku'], price, shipping)
+        while price * mwst - (shipping * mwst) - (wholesale_price + amazon_fee) < 0.1 * price:
+            price *= 1.05
+            amazon_fee = self.get_amazon_fee(item['sku'], price, shipping)
+        return price
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def get_product_information(self, item, german):
+        iso_code = 'de'
+        if not german:
+            iso_code = 'es'
+        item_url = self.bb_url + '/rest/catalog/productinformation/' + str(item['id']) + '.json?isoCode=' + iso_code
+        r = requests.get(item_url, headers=self.bb_header)
+        return json.loads(r.text)
+
+    def get_amazon_fee(self, sku, shipping, price):
+        response = self.products_api.get_my_fee_estimate(self.marketplace_id, sku, price, shipping)
+        fee_objects = response.parsed['FeesEstimateResultList']['FeesEstimateResult']
+        return float(fee_objects['FeesEstimate']['TotalFeesEstimate']['Amount']['value'])
+
+    def get_shipping_cost(self, item):
+        order_object = {"order": {"delivery": {"isoCountry": "DE", "postcode": "74336"},
+                                  "products": [{"reference": item['sku'], "quantity": "1"}]}}
+        json_body = json.dumps(order_object)
+        r = requests.post(self.bb_url + '/rest/shipping/orders.json', data=json_body, headers=self.bb_header)
+        cheapest_shipper = min(json.loads(r.text)['shippingOptions'], key=lambda x: x['cost'])
+        return cheapest_shipper['cost'], cheapest_shipper
+
+    # ------------------------------------------------------------------------------------------------------------------
 
     def is_valid_item(self, item, item_information):
         correct_size = self.is_approved_size(item)
@@ -119,7 +232,7 @@ class ManneBot:
         correct_sku = self.is_an_approved_sku(item_information)
         correct_category = self.is_an_approved_category(item_information)
         correct_name, german_name = self.is_same_name(item_information)
-        result = not (correct_size or correct_price or correct_brand or correct_sku or correct_category or correct_name)
+        result = correct_size and correct_price and correct_brand and correct_sku and correct_category and correct_name
         return result, german_name
 
     def is_same_name(self, item_information):
@@ -127,11 +240,14 @@ class ManneBot:
         if not len(amazon_item_list) > 0:
             print('Error while evaluating if item is valid for new pricing')
             return
-        if amazon_item_list[0]['name'] == item_information['name']:
+        if amazon_item_list[0][0] == item_information['name']:
             return True, True
         else:
             spanish_item = self.get_product_information(item_information, False)
-            if amazon_item_list[0]['name'] == spanish_item['name']:
+            while 'code' in spanish_item.keys():
+                sleep(5)
+                spanish_item = self.get_product_information(item_information, False)
+            if amazon_item_list[0][0] in spanish_item['name']:
                 return True, False
         return False, False
 
@@ -163,39 +279,6 @@ class ManneBot:
         if self.calculate_gurtmass([item['height'], item['width'], item['depth']]) < 300:
             return True
         return False
-
-    def submit_price(self, item, item_information, price, shipping):
-        rounded_price = self.round_price(price)
-        print('Price submitted for SKU: ', item['sku'], ' with price: ', rounded_price, ' + ', shipping)
-
-    def calculate_price(self, item, shipping):
-        wholesale_price = price = item['wholesalePrice']
-        mwst = 1 / 1.19
-        amazon_fee = self.get_amazon_fee(item['sku'], price, shipping)
-        while price * mwst - (shipping * mwst) - (wholesale_price + amazon_fee) < 0.1 * price:
-            price *= 1.05
-            amazon_fee = self.get_amazon_fee(item['sku'], price, shipping)
-        return price
-
-    def get_product_information(self, item, german):
-        iso_code = 'de'
-        if not german:
-            iso_code = 'es'
-        item_url = self.bb_url + '/rest/catalog/productinformation/' + str(item['id']) + '.json?isoCode=' + iso_code
-        r = requests.get(item_url, headers=self.bb_header)
-        return json.loads(r.text)
-
-    def get_amazon_fee(self, sku, shipping, price):
-        response = self.products_api.get_my_fee_estimate(self.marketplace_id, sku, price, shipping)
-        fee_objects = response.parsed['FeesEstimateResultList']['FeesEstimateResult']
-        return float(fee_objects['FeesEstimate']['TotalFeesEstimate']['Amount']['value'])
-
-    def get_shipping_cost(self, item):
-        order_object = {"order": {"delivery": {"isoCountry": "DE", "postcode": "74336"},
-                                  "products": [{"reference": item['sku'], "quantity": "1"}]}}
-        json_body = json.dumps(order_object)
-        r = requests.post(self.bb_url + '/rest/shipping/orders.json', data=json_body, headers=self.bb_header)
-        return min(json.loads(r.text)['shippingOptions'], key=lambda x: x['cost'])['cost']
 
     # ------------------------------------------------------------------------------------------------------------------
     @staticmethod
