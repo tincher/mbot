@@ -195,6 +195,7 @@ class ManneBot:
         if self.cursor.rowcount < 1:
             item_url = self.bb_url + '/rest/catalog/productinformation/' + str(item['id']) + '.json?isoCode=' + iso_code
             r = requests.get(item_url, headers=self.bb_header)
+            self.cursor.fetchall()
             return json.loads(r.text)
         else:
             item_info = self.cursor.fetchone()
@@ -255,6 +256,7 @@ class ManneBot:
             item_categories = [dict(zip(keys, item_category)) for item_category in self.cursor.fetchall()]
         category_list = self.get_csv_file_as_list('../categories.csv')
         same_categories = [x for x in item_categories if str(x['category']) in category_list]
+        self.cursor.fetchall()
         if len(same_categories) > 0:
             return False
         return True
