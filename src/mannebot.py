@@ -2,6 +2,7 @@ import csv
 import datetime
 import json
 import math
+import sys
 from time import sleep
 
 import mysql.connector
@@ -9,6 +10,7 @@ import requests
 
 from . import mws
 
+sys.stdout = open('file.log', 'w')
 
 class ManneBot:
     aws_id = ''
