@@ -70,13 +70,13 @@ class ManneBot:
             r = requests.get(bb_test_url, headers=self.bb_header)
             report_list = self.reports_api.get_report_list()
             if report_list.response.status_code == 200 and r.status_code == 200:
-                print('Connections successful')
+                myprint('Connections successful')
                 self.running = True
             else:
                 if report_list.response.status_code != 200:
-                    print('Connection to Amazon unsuccessful')
+                    myprint('Connection to Amazon unsuccessful')
                 if r.status_code != 200:
-                    print('Connection to BigBuy unsuccessful')
+                    myprint('Connection to BigBuy unsuccessful')
 
         connection_test()
         self.running = True
@@ -89,10 +89,10 @@ class ManneBot:
             self.product_list = self.product_filter(amazon_listing, bb_catalog)
             self.amazon_listing = amazon_listing
         except RefreshmentError as e:
-            print('Products could not be refreshed due to an Error: ', e.value)
+            myprint('Products could not be refreshed due to an Error: ', e.value)
         else:
-            print('Products successfully refreshed')
-            print('Product count: ', len(self.product_list))
+            myprint('Products successfully refreshed')
+            myprint('Product count: ', len(self.product_list))
 
     def update_price(self):
         if self.current_index >= len(self.product_list):
@@ -124,8 +124,8 @@ class ManneBot:
             price_response = self.feeds_api.submit_feed(self.price_submitting_feed, '_POST_PRODUCT_PRICING_DATA_',
                                                         marketplaceids=self.marketplace_id)
             self.price_submitting_feed = self.get_empty_price_feed_head()
-            print(price_response)
-            print('Prices submitted')
+            myprint(price_response)
+            myprint('Prices submitted')
 
     def get_empty_price_feed_head(self):
         return '<?xml version="1.0" encoding="utf-8" ?> ' \
@@ -225,7 +225,7 @@ class ManneBot:
     def is_same_name(self, item_information):
         amazon_item_list = [x for x in self.amazon_listing if x[3] == item_information['sku']]
         if not len(amazon_item_list) > 0:
-            print('Error while evaluating if item is valid for new pricing')
+            myprint('Error while evaluating if item is valid for new pricing')
             return
         if amazon_item_list[0][0] == item_information['name']:
             return True, True
@@ -313,7 +313,7 @@ class ManneBot:
             if len(matches) > 0:
                 result.append(i)
             if len(matches) > 1:
-                print('Multiple products with the same SKU detected')
+                myprint('Multiple products with the same SKU detected')
         return result
 
 
@@ -324,3 +324,8 @@ class RefreshmentError(Exception):
 
     def __str__(self):
         return repr(self.value)
+
+
+def myprint(text):
+    print(text, flush=True)
+    
