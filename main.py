@@ -17,3 +17,4 @@ while mbot.running:
     mbot.update_price()
     if (start_time - datetime.datetime.now()).seconds > 60 * 60 * 3:
         mbot.refresh_product_list()
+        start_time = datetime.datetime.now()
