@@ -125,7 +125,7 @@ class ManneBot:
             price_response = self.feeds_api.submit_feed(self.price_submitting_feed, '_POST_PRODUCT_PRICING_DATA_',
                                                         marketplaceids=self.marketplace_id)
             self.price_submitting_feed = self.get_empty_price_feed_head()
-            myprint(price_response)
+            myprint(price_response.parsed)
             myprint('Prices submitted')
 
     def get_empty_price_feed_head(self):
