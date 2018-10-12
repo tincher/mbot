@@ -34,7 +34,7 @@ class ManneBot:
 
     current_index = 0
 
-    minimum_marge_percentage = 0.1
+    minimum_marge_percentage = 0.2
 
     product_list = []
     amazon_listing = []
