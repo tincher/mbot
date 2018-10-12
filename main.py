@@ -9,7 +9,8 @@ start_time = datetime.datetime.now()
 config = configparser.ConfigParser()
 config.read('../account.ini')
 manne_conf = config['MANNE']
-mbot = ManneBot(manne_conf)
+db_conf = config['DB']
+mbot = ManneBot(manne_conf, db_conf)
 mbot.refresh_product_list()
 
 while mbot.running:

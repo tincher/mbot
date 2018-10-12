@@ -4,6 +4,7 @@ import json
 import math
 from time import sleep
 
+import mysql.connector
 import requests
 
 from . import mws
@@ -26,7 +27,6 @@ class ManneBot:
     last_feed_submitted_h = 0
     last_feed_submitted_min = 0
     price_submitting_feed = ''
-    shipping_override_feed = ''
     message_counter = 1
 
     current_index = 0
@@ -36,8 +36,11 @@ class ManneBot:
     product_list = []
     amazon_listing = []
 
+    db = {}
+    cursor = {}
+
     # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, config):
+    def __init__(self, config, conf):
         self.aws_id = config['aws_access_key_id']
         self.secret_key = config['secret_key']
         self.seller_id = config['seller_id']
@@ -53,7 +56,12 @@ class ManneBot:
 
         self.price_submitting_feed = self.get_empty_price_feed_head()
 
-        # self.shipping_override_feed = self.get_shipping_override_empty_feed_header()
+        self.db = mysql.connector.connect(
+            host=conf['host'],
+            user=conf['user'],
+            passwd=conf['password'],
+            database='mbot')
+        self.cursor = self.db.cursor()
 
         def connection_test():
             bb_test_url = self.bb_url + '/rest/user/purse.json?_format=json'
@@ -85,6 +93,8 @@ class ManneBot:
             print('Product count: ', len(self.product_list))
 
     def update_price(self):
+        if self.current_index >= len(self.product_list):
+            self.current_index = 0
         current_item = self.product_list[self.current_index]
         current_item_information = self.get_product_information(current_item, True)
         is_valid, is_german = self.is_valid_item(current_item, current_item_information)
@@ -97,8 +107,6 @@ class ManneBot:
         else:
             sleep(5)
         self.current_index += 1
-        if self.current_index >= len(self.product_list):
-            self.current_index = 0
 
     def submit_price(self, item, shipper, price, shipping):
         rounded_price = self.round_price(price + shipping - 5)
@@ -113,40 +121,9 @@ class ManneBot:
             self.price_submitting_feed = self.price_submitting_feed.encode('utf-8')
             price_response = self.feeds_api.submit_feed(self.price_submitting_feed, '_POST_PRODUCT_PRICING_DATA_',
                                                         marketplaceids=self.marketplace_id)
-            # self.shipping_override_feed += self.get_shipping_override_empty_feed_footer()
-            # self.shipping_override_feed = self.shipping_override_feed.encode('utf-8')
-            # shipping_response = self.feeds_api.submit_feed(self.shipping_override_feed,
-            #  '_POST_PRODUCT_OVERRIDES_DATA_', marketplaceids=self.marketplace_id)
-            # self.shipping_override_feed = self.get_shipping_override_empty_feed_header()
             self.price_submitting_feed = self.get_empty_price_feed_head()
             print(price_response)
-            # print(shipping_response)
             print('Prices submitted')
-
-    # def get_shipping_override_empty_feed_footer(self):
-    #     return '</AmazonEnvelope>'
-    #
-    # def get_shipping_override_empty_feed_header(self):
-    #     return '<?xml version="1.0" encoding="utf-8" ?> ' \
-    #            '<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' \
-    #            'xsi:noNamespaceSchemaLocation="amzn-envelope.xsd"> ' \
-    #            '<Header> <DocumentVersion>1.02</DocumentVersion> ' \
-    #            '<MerchantIdentifier>' + self.seller_id + '</MerchantIdentifier> </Header>' \
-    #                                                      ' <MessageType>Override</MessageType>'
-    #
-    # def get_shipping_override_feed_for_product(self, item, shipping, shipping_name):
-    #     feed_content = '<Message>' \
-    #                    '<MessageID>1</MessageID>' \
-    #                    '<OperationType>Update</OperationType>' \
-    #                    '<Override>' \
-    #                    '<SKU>' + str(item['sku']) + '</SKU>' \
-    #                                                 '<ShippingOverride><ShipOption>Std DE Dom</ShipOption>' \
-    #                                                 '<Type>Exclusive</Type>' \
-    #                                                 '<ShipAmount currency="EUR">' + str(
-    #         shipping) + '</ShipAmount></ShippingOverride></Override>' \
-    #                     '</Message>'
-    #
-    #     return feed_content
 
     def get_empty_price_feed_head(self):
         return '<?xml version="1.0" encoding="utf-8" ?> ' \
@@ -169,8 +146,10 @@ class ManneBot:
 
     # ------------------------------------------------------------------------------------------------------------------
     def get_bb_listing_skus_and_catalog(self):
-        bb_catalog_url = self.bb_url + '/rest/catalog/products.json'
-        bb_catalog = json.loads(requests.get(bb_catalog_url, headers=self.bb_header).text)
+        # bb_catalog_url = self.bb_url + '/rest/catalog/products.json'
+        # bb_catalog = json.loads(requests.get(bb_catalog_url, headers=self.bb_header).text)
+        bb_catalog = self.cursor.execute('SELECT * FROM bb_items')
+
         sku_list = list(map(lambda x: x["sku"], bb_catalog))
         if not len(sku_list) > 0:
             raise RefreshmentError('BigBuy: Catalog not receivable')
@@ -203,12 +182,18 @@ class ManneBot:
 
     # ------------------------------------------------------------------------------------------------------------------
     def get_product_information(self, item, german):
+        # spanish items!
         iso_code = 'de'
         if not german:
             iso_code = 'es'
-        item_url = self.bb_url + '/rest/catalog/productinformation/' + str(item['id']) + '.json?isoCode=' + iso_code
-        r = requests.get(item_url, headers=self.bb_header)
-        return json.loads(r.text)
+        self.cursor.execute(
+            'SELECT * FROM bb_item_information WHERE id = ' + str(item['id']) + ' AND isoCode = ' + iso_code)
+        if self.cursor.rowcount < 1:
+            item_url = self.bb_url + '/rest/catalog/productinformation/' + str(item['id']) + '.json?isoCode=' + iso_code
+            r = requests.get(item_url, headers=self.bb_header)
+            return json.loads(r.text)
+        keys = ['id', 'name', 'sku', 'isoCode']
+        return dict(zip(keys, self.cursor.fetchone()))
 
     def get_amazon_fee(self, sku, shipping, price):
         response = self.products_api.get_my_fee_estimate(self.marketplace_id, sku, price, shipping)
@@ -244,7 +229,7 @@ class ManneBot:
             return True, True
         else:
             spanish_item = self.get_product_information(item_information, False)
-            while 'code' in spanish_item.keys():
+            while 'code' in spanish_item:
                 sleep(5)
                 spanish_item = self.get_product_information(item_information, False)
             if amazon_item_list[0][0] in spanish_item['name']:
@@ -252,9 +237,16 @@ class ManneBot:
         return False, False
 
     def is_an_approved_category(self, item_information):
-        category_url = self.bb_url + '/rest/catalog/productcategories/' + str(item_information['id']) + '.json'
-        r = requests.get(category_url, headers=self.bb_header)
-        item_categories = json.loads(r.text)
+        item_categories = []
+        self.cursor.execute(
+            'SELECT * FROM bb_item_categories WHERE id = ' + str(item_information['id']))
+        if self.cursor.rowcount < 1:
+            category_url = self.bb_url + '/rest/catalog/productcategories/' + str(item_information['id']) + '.json'
+            r = requests.get(category_url, headers=self.bb_header)
+            item_categories = json.loads(r.text)
+        else:
+            keys = ['id', 'name', 'sku', 'isoCode']
+            item_categories = [dict(zip(keys, item_category)) for item_category in self.cursor.fetchall()]
         category_list = self.get_csv_file_as_list('../categories.csv')
         same_categories = [x for x in item_categories if str(x['category']) in category_list]
         if len(same_categories) > 0:
