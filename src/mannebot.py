@@ -191,13 +191,14 @@ class ManneBot:
         if not german:
             iso_code = 'es'
         self.cursor.execute(
-            'SELECT * FROM bb_item_information WHERE id = ' + str(item['id']) + ' AND isoCode = ' + iso_code)
+            'SELECT * FROM bb_item_information WHERE id = ' + str(item['id']) + ' AND isoCode = "' + iso_code + '"')
+        item_info = self.cursor.fetchone()
         if self.cursor.rowcount < 1:
             item_url = self.bb_url + '/rest/catalog/productinformation/' + str(item['id']) + '.json?isoCode=' + iso_code
             r = requests.get(item_url, headers=self.bb_header)
             return json.loads(r.text)
         keys = ['id', 'name', 'sku', 'isoCode']
-        return dict(zip(keys, self.cursor.fetchone()))
+        return dict(zip(keys, item_info))
 
     def get_amazon_fee(self, sku, shipping, price):
         response = self.products_api.get_my_fee_estimate(self.marketplace_id, sku, price, shipping)
