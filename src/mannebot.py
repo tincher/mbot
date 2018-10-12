@@ -196,6 +196,9 @@ class ManneBot:
             item_url = self.bb_url + '/rest/catalog/productinformation/' + str(item['id']) + '.json?isoCode=' + iso_code
             r = requests.get(item_url, headers=self.bb_header)
             self.cursor.fetchall()
+            while 'code' in r.text:
+                sleep(30)
+                r = requests.get(item_url, headers=self.bb_header)
             return json.loads(r.text)
         else:
             item_info = self.cursor.fetchone()
