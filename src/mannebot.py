@@ -12,6 +12,7 @@ from . import mws
 
 sys.stdout = open('file.log', 'w')
 
+
 class ManneBot:
     aws_id = ''
     seller_id = ''
@@ -89,10 +90,10 @@ class ManneBot:
             self.product_list = self.product_filter(amazon_listing, bb_catalog)
             self.amazon_listing = amazon_listing
         except RefreshmentError as e:
-            myprint('Products could not be refreshed due to an Error: ', e.value)
+            myprint('Products could not be refreshed due to an Error: ' + e.value)
         else:
             myprint('Products successfully refreshed')
-            myprint('Product count: ', len(self.product_list))
+            myprint('Product count: ' + str(len(self.product_list)))
 
     def update_price(self):
         if self.current_index >= len(self.product_list):
@@ -150,8 +151,9 @@ class ManneBot:
     def get_bb_listing_skus_and_catalog(self):
         # bb_catalog_url = self.bb_url + '/rest/catalog/products.json'
         # bb_catalog = json.loads(requests.get(bb_catalog_url, headers=self.bb_header).text)
-        bb_catalog = self.cursor.execute('SELECT * FROM bb_items')
-
+        self.cursor.execute('SELECT * FROM bb_items')
+        keys = ['id', 'sku', 'wholesalePrice', 'height', 'width', 'depth']
+        bb_catalog = [dict(zip(keys, x)) for x in self.cursor.fetchall()]
         sku_list = list(map(lambda x: x["sku"], bb_catalog))
         if not len(sku_list) > 0:
             raise RefreshmentError('BigBuy: Catalog not receivable')
@@ -169,7 +171,7 @@ class ManneBot:
                 raise RefreshmentError('Amazon: No Merchant Listing Data')
             report = self.reports_api.get_report(newest_report_meta_list[0].ReportId)
             parsed_report = report.parsed.decode('iso-8859-1').split('\n')
-            amazon_listing = [x for x in list(map(lambda x: x.split('\t'), parsed_report)) if len(x) == 48]
+            amazon_listing = [x for x in list(map(lambda x: x.split('\t'), parsed_report)) if len(x) > 3]
             sku_list = list(map(lambda x: x[3] if not len(x) < 3 else 0, amazon_listing))
             return sku_list, amazon_listing
 
@@ -328,4 +330,3 @@ class RefreshmentError(Exception):
 
 def myprint(text):
     print(text, flush=True)
-    
