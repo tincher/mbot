@@ -117,7 +117,7 @@ class ManneBot:
         # self.shipping_override_feed += self.get_shipping_override_feed_for_product(item, shipping,
         #                                                                            shipper['shippingService']['name'])
         now = datetime.datetime.now()
-        if self.last_feed_submitted_h <= now.hour and self.last_feed_submitted_min + 3 < now.minute:
+        if self.last_feed_submitted_h <= now.hour and self.last_feed_submitted_min + 10 < now.minute:
             self.last_feed_submitted_h = now.hour
             self.last_feed_submitted_min = now.minute
             self.price_submitting_feed += self.get_emtpy_price_feed_footer()
