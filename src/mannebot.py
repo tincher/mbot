@@ -208,6 +208,10 @@ class ManneBot:
     def get_amazon_fee(self, sku, shipping, price):
         response = self.products_api.get_my_fee_estimate(self.marketplace_id, sku, price, shipping)
         fee_objects = response.parsed['FeesEstimateResultList']['FeesEstimateResult']
+        while 'FeesEstimate' not in fee_objects:
+            sleep(120)
+            response = self.products_api.get_my_fee_estimate(self.marketplace_id, sku, price, shipping)
+            fee_objects = response.parsed['FeesEstimateResultList']['FeesEstimateResult']
         return float(fee_objects['FeesEstimate']['TotalFeesEstimate']['Amount']['value'])
 
     def get_shipping_cost(self, item):
