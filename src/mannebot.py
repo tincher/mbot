@@ -32,7 +32,7 @@ class ManneBot:
     price_submitting_feed = ''
     message_counter = 1
 
-    current_index = 0
+    current_index = 50
 
     minimum_marge_percentage = 0.2
 
@@ -108,7 +108,7 @@ class ManneBot:
                 pass  # todo
             self.submit_price(current_item, shipper, price, shipping_cost)
         else:
-            sleep(5)
+            sleep(20)
         self.current_index += 1
 
     def submit_price(self, item, shipper, price, shipping):
@@ -117,6 +117,7 @@ class ManneBot:
         # self.shipping_override_feed += self.get_shipping_override_feed_for_product(item, shipping,
         #                                                                            shipper['shippingService']['name'])
         now = datetime.datetime.now()
+        print('trying to submit')
         if self.last_feed_submitted_h <= now.hour and self.last_feed_submitted_min + 20 < now.minute:
             self.last_feed_submitted_h = now.hour
             self.last_feed_submitted_min = now.minute
@@ -196,8 +197,11 @@ class ManneBot:
             item_url = self.bb_url + '/rest/catalog/productinformation/' + str(item['id']) + '.json?isoCode=' + iso_code
             r = requests.get(item_url, headers=self.bb_header)
             self.cursor.fetchall()
+            print('fetching item for the first time')
+            print('Index : ' + str(self.current_index))
             while 'code' in r.text:
                 sleep(30)
+                print('trying to fetch item_info again')
                 r = requests.get(item_url, headers=self.bb_header)
             return json.loads(r.text)
         else:
@@ -209,7 +213,7 @@ class ManneBot:
         response = self.products_api.get_my_fee_estimate(self.marketplace_id, sku, price, shipping)
         fee_objects = response.parsed['FeesEstimateResultList']['FeesEstimateResult']
         while 'FeesEstimate' not in fee_objects:
-            sleep(120)
+            sleep(5)
             response = self.products_api.get_my_fee_estimate(self.marketplace_id, sku, price, shipping)
             fee_objects = response.parsed['FeesEstimateResultList']['FeesEstimateResult']
         return float(fee_objects['FeesEstimate']['TotalFeesEstimate']['Amount']['value'])
