@@ -2,7 +2,6 @@ import csv
 import datetime
 import json
 import math
-import sys
 from time import sleep
 
 import mysql.connector
@@ -10,7 +9,8 @@ import requests
 
 from . import mws
 
-sys.stdout = open('file.log', 'w')
+
+# sys.stdout = open('file.log', 'w')
 
 
 class ManneBot:
@@ -32,7 +32,7 @@ class ManneBot:
     price_submitting_feed = ''
     message_counter = 1
 
-    current_index = 50
+    current_index = 10000
 
     minimum_marge_percentage = 0.2
 
@@ -98,6 +98,7 @@ class ManneBot:
     def update_price(self):
         if self.current_index >= len(self.product_list):
             self.current_index = 0
+        print('index' + str(self.current_index))
         current_item = self.product_list[self.current_index]
         current_item_information = self.get_product_information(current_item, True)
         is_valid, is_german = self.is_valid_item(current_item, current_item_information)
@@ -163,13 +164,16 @@ class ManneBot:
     def get_amazon_listing(self):
         report_request = self.reports_api.request_report(report_type='_GET_MERCHANT_LISTINGS_DATA_')
         if report_request.response.status_code == 200:
-            starting_date = datetime.datetime.now() - datetime.timedelta(hours=5)
+            starting_date = datetime.datetime.now() - datetime.timedelta(hours=6)
             sleep(60)
             report_list = self.reports_api.get_report_list(fromdate=starting_date)
             newest_report_meta_list = list(
                 filter(lambda x: x.ReportType == '_GET_MERCHANT_LISTINGS_DATA_', report_list.parsed.ReportInfo))
-            if len(newest_report_meta_list) <= 0:
-                raise RefreshmentError('Amazon: No Merchant Listing Data')
+            while bool(report_list.parsed['HasNext']['value']) and len(newest_report_meta_list) < 1:
+                report_list = self.reports_api.get_report_list(fromdate=starting_date,
+                                                               next_token=report_list.parsed['NextToken']['value'])
+                newest_report_meta_list = list(
+                    filter(lambda x: x.ReportType == '_GET_MERCHANT_LISTINGS_DATA_', report_list.parsed.ReportInfo))
             report = self.reports_api.get_report(newest_report_meta_list[0].ReportId)
             parsed_report = report.parsed.decode('iso-8859-1').split('\n')
             amazon_listing = [x for x in list(map(lambda x: x.split('\t'), parsed_report)) if len(x) > 3]
