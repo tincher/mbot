@@ -162,7 +162,7 @@ class ManneBot:
     def get_delete_message_for_item(self, item):
         return '<Message><MessageID>' + str(
             self.delete_message_counter) + '</MessageID><OperationType>Delete</OperationType><Product><SKU>' + str(
-            item['sku']) + '</SKU></Message>'
+            item['sku']) + '</SKU></Product></Message>'
 
     @staticmethod
     def get_empty_delete_feed_foot():
