@@ -29,8 +29,11 @@ class ManneBot:
     last_product_refreshment_min = 0
     last_feed_submitted_h = 0
     last_feed_submitted_min = 0
+    last_feed_submitted_datetime = datetime.datetime.now()
     price_submitting_feed = ''
+    delete_submitting_feed = ''
     message_counter = 1
+    delete_message_counter = 1
 
     current_index = 10000
 
@@ -58,6 +61,7 @@ class ManneBot:
                                          region='DE')
 
         self.price_submitting_feed = self.get_empty_price_feed_head()
+        self.delete_submitting_feed = self.get_empty_delete_feed_head()
 
         self.db = mysql.connector.connect(
             host=conf['host'],
@@ -109,19 +113,32 @@ class ManneBot:
                 pass  # todo
             self.submit_price(current_item, shipper, price, shipping_cost)
         else:
-            sleep(20)
+            self.delete_item(current_item)
         self.current_index += 1
+
+    def delete_item(self, item):
+        self.delete_submitting_feed += self.get_delete_message_for_item(item)
+        if self.last_feed_submitted_datetime + datetime.timedelta(minutes=20) < datetime.datetime.now():
+            self.delete_submitting_feed += self.get_empty_delete_feed_foot()
+            self.last_feed_submitted_datetime = datetime.datetime.now()
+            deletion_response = self.feeds_api.submit_feed(self.delete_submitting_feed, '_POST_PRODUCT_PRICING_DATA_',
+                                                           marketplaceids=self.marketplace_id)
+            self.delete_submitting_feed = self.get_empty_delete_feed_head()
+            myprint(deletion_response.parsed)
+            myprint('items deleted')
 
     def submit_price(self, item, shipper, price, shipping):
         rounded_price = self.round_price(price + shipping - 5)
         self.price_submitting_feed += self.get_price_feed_for_product(item, rounded_price)
         # self.shipping_override_feed += self.get_shipping_override_feed_for_product(item, shipping,
         #                                                                            shipper['shippingService']['name'])
-        now = datetime.datetime.now()
+        # now = datetime.datetime.now()
         print('trying to submit')
-        if self.last_feed_submitted_h <= now.hour and self.last_feed_submitted_min + 20 < now.minute:
-            self.last_feed_submitted_h = now.hour
-            self.last_feed_submitted_min = now.minute
+        if self.last_feed_submitted_datetime + datetime.timedelta(minutes=20) < datetime.datetime.now():
+            # if self.last_feed_submitted_h < now.hour or self.last_feed_submitted_min + 20 < now.minute:
+            # self.last_feed_submitted_h = now.hour
+            # self.last_feed_submitted_min = now.minute
+            self.last_feed_submitted_datetime = datetime.datetime.now()
             self.price_submitting_feed += self.get_emtpy_price_feed_footer()
             self.price_submitting_feed = self.price_submitting_feed.encode('utf-8')
             price_response = self.feeds_api.submit_feed(self.price_submitting_feed, '_POST_PRODUCT_PRICING_DATA_',
@@ -129,6 +146,26 @@ class ManneBot:
             self.price_submitting_feed = self.get_empty_price_feed_head()
             myprint(price_response.parsed)
             myprint('Prices submitted')
+
+    def get_empty_delete_feed_head(self):
+        return '<?xml version="1.0" encoding="UTF-8"?> ' \
+               '<AmazonEnvelope' \
+               'xmlns: xsi = "http://www.w3.org/2001/XMLSchema-instance"' \
+               'xsi: noNamespaceSchemaLocation = "amzn-envelope.xsd">' \
+               '<Header>' \
+               '<DocumentVersion>1.01</DocumentVersion >' \
+               '<MerchantIdentifier>' + str(self.seller_id) + '</MerchantIdentifier>' \
+                                                              '</Header>' \
+                                                              '<MessageType>Product</MessageType> '
+
+    def get_delete_message_for_item(self, item):
+        return '<Message><MessageID>' + str(
+            self.delete_message_counter) + '</MessageID><OperationType>Delete</OperationType><Product><SKU>' + str(
+            item['sku']) + '</SKU></Message>'
+
+    @staticmethod
+    def get_empty_delete_feed_foot():
+        return '</AmazonEnvelope>'
 
     def get_empty_price_feed_head(self):
         return '<?xml version="1.0" encoding="utf-8" ?> ' \
