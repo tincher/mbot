@@ -150,8 +150,8 @@ class ManneBot:
     def get_empty_delete_feed_head(self):
         return '<?xml version="1.0" encoding="UTF-8"?> ' \
                '<AmazonEnvelope' \
-               'xmlns: xsi = "http://www.w3.org/2001/XMLSchema-instance"' \
-               'xsi: noNamespaceSchemaLocation = "amzn-envelope.xsd">' \
+               'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' \
+               'xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">' \
                '<Header>' \
                '<DocumentVersion>1.01</DocumentVersion >' \
                '<MerchantIdentifier>' + str(self.seller_id) + '</MerchantIdentifier>' \
