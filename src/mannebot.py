@@ -95,6 +95,7 @@ class ManneBot:
             self.amazon_listing = amazon_listing
         except RefreshmentError as e:
             myprint('Products could not be refreshed due to an Error: ' + e.value)
+            self.running = False
         else:
             myprint('Products successfully refreshed')
             myprint('Product count: ' + str(len(self.product_list)))
@@ -118,8 +119,10 @@ class ManneBot:
 
     def delete_item(self, item):
         self.delete_submitting_feed += self.get_delete_message_for_item(item)
+        myprint('trying to delete')
         if self.last_feed_submitted_datetime + datetime.timedelta(minutes=20) < datetime.datetime.now():
             self.delete_submitting_feed += self.get_empty_delete_feed_foot()
+            self.delete_submitting_feed = self.delete_submitting_feed.encode('utf-8')
             self.last_feed_submitted_datetime = datetime.datetime.now()
             deletion_response = self.feeds_api.submit_feed(self.delete_submitting_feed, '_POST_PRODUCT_PRICING_DATA_',
                                                            marketplaceids=self.marketplace_id)
@@ -130,10 +133,7 @@ class ManneBot:
     def submit_price(self, item, shipper, price, shipping):
         rounded_price = self.round_price(price + shipping - 5)
         self.price_submitting_feed += self.get_price_feed_for_product(item, rounded_price)
-        # self.shipping_override_feed += self.get_shipping_override_feed_for_product(item, shipping,
-        #                                                                            shipper['shippingService']['name'])
-        # now = datetime.datetime.now()
-        print('trying to submit')
+        myprint('trying to submit')
         if self.last_feed_submitted_datetime + datetime.timedelta(minutes=20) < datetime.datetime.now():
             # if self.last_feed_submitted_h < now.hour or self.last_feed_submitted_min + 20 < now.minute:
             # self.last_feed_submitted_h = now.hour
