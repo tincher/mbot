@@ -103,10 +103,12 @@ class ManneBot:
     def update_price(self):
         if self.current_index >= len(self.product_list):
             self.current_index = 0
-        print('index' + str(self.current_index))
+        myprint('index: ' + str(self.current_index))
+        myprint('current time: ' + str(datetime.datetime.now()))
         current_item = self.product_list[self.current_index]
         current_item_information = self.get_product_information(current_item, True)
         is_valid, is_german = self.is_valid_item(current_item, current_item_information)
+        myprint('valid: ' + str(is_valid) + '\n\n')
         if is_valid:
             shipping_cost, shipper = self.get_shipping_cost(current_item)
             price = self.calculate_price(current_item, shipping_cost)
