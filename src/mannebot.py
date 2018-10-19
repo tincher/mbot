@@ -120,7 +120,7 @@ class ManneBot:
         self.current_index += 1
 
     def delete_item(self, item):
-        self.delete_submitting_feed += self.get_delete_message_for_item(item)
+        self.delete_submitting_feed += self.get_price_feed_for_product(item, item['amazonprice'])
         myprint('trying to delete')
         if self.last_feed_submitted_datetime + datetime.timedelta(minutes=1) < datetime.datetime.now():
             self.delete_submitting_feed += self.get_empty_delete_feed_foot()
@@ -369,10 +369,11 @@ class ManneBot:
         result = []
         for i in bb_catalog:
             matches = [x for x in amazon_listing if x[3] == i['sku']]
-            if len(matches) > 0:
-                result.append(i)
             if len(matches) > 1:
                 myprint('Multiple products with the same SKU detected')
+            if len(matches) > 0:
+                i.update({'amazonprice': matches[0][4]})
+                result.append(i)
         return result
 
 
