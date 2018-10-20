@@ -35,7 +35,7 @@ class ManneBot:
     message_counter = 1
     delete_message_counter = 1
 
-    current_index = 10000
+    current_index = 1
 
     minimum_marge_percentage = 0.2
 
@@ -44,6 +44,7 @@ class ManneBot:
 
     db = {}
     cursor = {}
+    file = ()
 
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, config, conf):
@@ -69,6 +70,10 @@ class ManneBot:
             passwd=conf['password'],
             database='mbot')
         self.cursor = self.db.cursor()
+
+        self.file = open('current_index.txt', 'r')
+        self.current_index = int(self.file.readline())
+        self.file.close()
 
         def connection_test():
             bb_test_url = self.bb_url + '/rest/user/purse.json?_format=json'
@@ -103,6 +108,9 @@ class ManneBot:
     def update_price(self):
         if self.current_index >= len(self.product_list):
             self.current_index = 0
+        self.file = open('current_index.txt', 'w')
+        self.file.write(str(self.current_index))
+        self.file.flush()
         myprint('index: ' + str(self.current_index))
         myprint('current time: ' + str(datetime.datetime.now()))
         current_item = self.product_list[self.current_index]
