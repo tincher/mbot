@@ -134,7 +134,7 @@ class ManneBot:
         if self.last_deletion_feed_datetime + datetime.timedelta(minutes=1) < datetime.datetime.now():
             self.delete_submitting_feed += self.get_empty_delete_feed_foot()
             self.delete_submitting_feed = self.delete_submitting_feed.encode('utf-8')
-            self.last_feed_submitted_datetime = datetime.datetime.now()
+            self.last_deletion_feed_datetime = datetime.datetime.now()
             deletion_response = self.feeds_api.submit_feed(self.delete_submitting_feed, '_POST_PRODUCT_PRICING_DATA_',
                                                            marketplaceids=self.marketplace_id)
             self.delete_submitting_feed = self.get_empty_delete_feed_head()
