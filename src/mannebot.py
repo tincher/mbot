@@ -30,6 +30,7 @@ class ManneBot:
     last_feed_submitted_h = 0
     last_feed_submitted_min = 0
     last_feed_submitted_datetime = datetime.datetime.now()
+    last_deletion_feed_datetime = datetime.datetime.now()
     price_submitting_feed = ''
     delete_submitting_feed = ''
     message_counter = 1
@@ -130,7 +131,7 @@ class ManneBot:
     def delete_item(self, item):
         self.delete_submitting_feed += self.get_price_feed_for_product(item, item['amazonprice'])
         myprint('trying to delete')
-        if self.last_feed_submitted_datetime + datetime.timedelta(minutes=1) < datetime.datetime.now():
+        if self.last_deletion_feed_datetime + datetime.timedelta(minutes=1) < datetime.datetime.now():
             self.delete_submitting_feed += self.get_empty_delete_feed_foot()
             self.delete_submitting_feed = self.delete_submitting_feed.encode('utf-8')
             self.last_feed_submitted_datetime = datetime.datetime.now()
