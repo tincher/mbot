@@ -110,7 +110,7 @@ class ManneBot:
         if self.current_index >= len(self.product_list):
             self.current_index = 0
         self.file = open('current_index.txt', 'w')
-        self.file.write(str(self.current_index))
+        self.file.write(str(self.current_index + 1))
         self.file.flush()
         myprint('index: ' + str(self.current_index))
         myprint('current time: ' + str(datetime.datetime.now()))
