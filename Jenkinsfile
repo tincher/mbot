@@ -3,6 +3,10 @@
 pipeline {
     agent any
     stages {
-        sh 'cp * /home/mannebot/mbot'
+         stage('Copy'){
+             steps{
+                 sh 'cp * /home/mannebot/mbot'
+             }
+        }
     }
 }
