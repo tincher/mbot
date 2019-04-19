@@ -19,6 +19,7 @@ pipeline {
         }
         stage('Start'){
             steps {
+                sh ''
                 // sh 'python3 /home/mannebot/mbot/main.py'
             }
         }
