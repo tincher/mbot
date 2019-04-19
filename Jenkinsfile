@@ -5,7 +5,7 @@ pipeline {
     stages {
          stage('Copy'){
              steps{
-                 sh 'cp * /home/mannebot/mbot'
+                 sh 'cp -r * /home/mannebot/mbot'
              }
         }
     }
