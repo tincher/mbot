@@ -17,5 +17,10 @@ pipeline {
                 sh 'rm mycron'
             }
         }
+        stage('Start'){
+            steps {
+                sh 'python3 /home/mannebot/mbot/main.py'
+            }
+        }
     }
 }
