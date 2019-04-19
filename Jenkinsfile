@@ -10,7 +10,7 @@ pipeline {
         }
         stage('Setup'){
             steps {
-                sh 'cronjob=crontab -l | grep -cv "main"'
+                sh /cronjob=crontab -l | grep -cv 'main'/
                 sh 'crontab -l | { cat; if [[ $cronjob ]]; then echo "@hourly python3 /home/mannebot/mbot/main.py"; fi;"; } | crontab -;'
             }
         }
