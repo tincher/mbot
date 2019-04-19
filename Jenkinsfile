@@ -11,7 +11,8 @@ pipeline {
         stage('Setup'){
             steps {
                 sh 'crontab -l > mycron'
-                sh 'echo "@hourly python3 /home/mannebot/mbot/main.py" >> mycron'
+                sh 'croncondition=$(crontab -l | grep -c mbot)'
+                sh 'if [[ $croncondition -gt 0 ]] ; then echo "@hourly python3 /home/mannebot/mbot/main.py" >> mycron; fi'
                 sh 'crontab mycron'
                 sh 'rm mycron'
             }
